@@ -1,0 +1,831 @@
+import streamlit as st
+import requests
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="ShareStone",
+    page_icon="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230071E3'/><text y='22' x='6' font-size='18' fill='white' font-family='Helvetica Neue'>S</text></svg>",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ─────────────────────────────────────────────
+# DUMMY DATA  (TODO: connect to real data)
+# ─────────────────────────────────────────────
+DUMMY_COMPARABLES = [
+    {"address": "142 Elm Ridge Dr",  "city": "Hilliard, OH",   "beds": 3, "baths": 2.0, "sqft": 1920, "price": 318000, "share": 3180, "delta": "+2.1%"},
+    {"address": "87 Oakmont Blvd",   "city": "Dublin, OH",     "beds": 4, "baths": 3.0, "sqft": 2310, "price": 412000, "share": 4120, "delta": "+0.8%"},
+    {"address": "29 Maple Creek Ln", "city": "Powell, OH",     "beds": 3, "baths": 2.5, "sqft": 2050, "price": 375000, "share": 3750, "delta": "-0.4%"},
+    {"address": "511 Westfield Ct",  "city": "Worthington, OH","beds": 4, "baths": 2.0, "sqft": 2180, "price": 395000, "share": 3950, "delta": "+1.3%"},
+    {"address": "204 Birchwood Dr",  "city": "New Albany, OH", "beds": 5, "baths": 3.5, "sqft": 2900, "price": 520000, "share": 5200, "delta": "+3.7%"},
+]
+
+DUMMY_KPI = {
+    "listings":  "48,210",
+    "avg_share": "$2,840",
+    "markets":   "32",
+    "aum":       "$124M",
+}
+
+DUMMY_STATE_VALUES = {
+    "California": 680000, "New York": 590000, "Texas": 340000,
+    "Florida": 390000, "Ohio": 295000, "Washington": 510000,
+    "Colorado": 475000, "Georgia": 320000,
+}
+
+DUMMY_TREND = {
+    "months": ["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"],
+    "prices": [2410, 2480, 2520, 2610, 2570, 2640, 2700, 2750, 2820, 2795, 2860, 2910],
+}
+
+DUMMY_PORTFOLIO = [
+    {"property": "142 Elm Ridge Dr",   "location": "Hilliard, OH",   "share_pct": "1.0%", "purchase": 3100, "current": 3420, "return_pct": "+10.3%"},
+    {"property": "511 Westfield Ct",   "location": "Worthington, OH","share_pct": "0.5%", "purchase": 1950, "current": 1975, "return_pct": "+1.3%"},
+    {"property": "88 Lakeview Pkwy",   "location": "Austin, TX",     "share_pct": "2.0%", "purchase": 7200, "current": 8100, "return_pct": "+12.5%"},
+    {"property": "33 Ocean Mist Blvd", "location": "Miami, FL",      "share_pct": "0.5%", "purchase": 2800, "current": 3150, "return_pct": "+12.5%"},
+]
+
+DUMMY_LISTINGS = [
+    {"address": "142 Elm Ridge Dr",   "city": "Hilliard, OH",   "price": 318000, "share": 3180, "beds": 3, "baths": 2.0, "sqft": 1920, "type": "Single Family", "yield": "6.2%"},
+    {"address": "29 Maple Creek Ln",  "city": "Powell, OH",     "price": 375000, "share": 3750, "beds": 3, "baths": 2.5, "sqft": 2050, "type": "Single Family", "yield": "5.9%"},
+    {"address": "88 Lakeview Pkwy",   "city": "Austin, TX",     "price": 460000, "share": 4600, "beds": 4, "baths": 3.0, "sqft": 2400, "type": "Single Family", "yield": "6.8%"},
+    {"address": "204 Birchwood Dr",   "city": "New Albany, OH", "price": 520000, "share": 5200, "beds": 5, "baths": 3.5, "sqft": 2900, "type": "Single Family", "yield": "5.4%"},
+    {"address": "33 Ocean Mist Blvd", "city": "Miami, FL",      "price": 710000, "share": 7100, "beds": 4, "baths": 4.0, "sqft": 3100, "type": "Condo",         "yield": "7.1%"},
+    {"address": "17 Harbor Lofts",    "city": "Brooklyn, NY",   "price": 890000, "share": 8900, "beds": 2, "baths": 2.0, "sqft": 1100, "type": "Multi-Family",  "yield": "7.8%"},
+]
+
+DUMMY_TEAM = [
+    {"name": "Alexandra Chen",  "title": "Co-Founder & CEO",    "init": "AC"},
+    {"name": "Marcus Webb",     "title": "Co-Founder & CTO",    "init": "MW"},
+    {"name": "Priya Nambiar",   "title": "Head of Acquisitions","init": "PN"},
+]
+
+# ─────────────────────────────────────────────
+# GLOBAL CSS — APPLE DESIGN SYSTEM
+# ─────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
+
+/* ── Reset ── */
+#MainMenu, footer, header { visibility: hidden; }
+* { box-sizing: border-box; }
+
+/* ── App Shell ── */
+.stApp {
+    background-color: #F5F5F7;
+    font-family: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+.block-container {
+    padding: 3rem 3.5rem 5rem;
+    max-width: 1180px;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #FFFFFF;
+    border-right: 1px solid #E8E8ED;
+}
+[data-testid="stSidebar"] > div:first-child {
+    padding-top: 2rem;
+}
+
+/* ── Sidebar Nav Radio ── */
+div[data-testid="stSidebar"] .stRadio > label {
+    display: none !important;
+}
+div[data-testid="stSidebar"] .stRadio > div {
+    gap: 0 !important;
+    flex-direction: column !important;
+}
+div[data-testid="stSidebar"] .stRadio > div > label {
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 0.88rem !important;
+    font-weight: 500 !important;
+    color: #1D1D1F !important;
+    padding: 0.6rem 1.1rem !important;
+    border-radius: 10px !important;
+    margin: 1px 6px !important;
+    cursor: pointer !important;
+    transition: background 0.1s ease !important;
+}
+div[data-testid="stSidebar"] .stRadio > div > label:hover {
+    background: #F5F5F7 !important;
+}
+div[data-testid="stSidebar"] .stRadio > div > label[data-checked="true"],
+div[data-testid="stSidebar"] .stRadio > div > label[aria-checked="true"] {
+    background: #EBF2FF !important;
+    color: #0071E3 !important;
+    font-weight: 600 !important;
+}
+div[data-testid="stSidebar"] .stRadio > div > label > div:first-child {
+    display: none !important;
+}
+
+/* ── Page Header ── */
+.ss-page-header {
+    margin-bottom: 2.25rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #E8E8ED;
+}
+.ss-page-title {
+    font-family: "Manrope", "Helvetica Neue", sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1D1D1F;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    margin: 0 0 0.3rem 0;
+}
+.ss-page-subtitle {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: #86868B;
+}
+
+/* ── Cards ── */
+.ss-card {
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 1.75rem;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
+    margin-bottom: 1.25rem;
+}
+
+/* ── Streamlit Metrics ── */
+[data-testid="metric-container"] {
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 18px;
+    padding: 1.5rem 1.75rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+[data-testid="stMetricValue"] {
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 1.85rem !important;
+    font-weight: 800 !important;
+    color: #1D1D1F !important;
+    letter-spacing: -0.04em !important;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07em !important;
+    color: #86868B !important;
+}
+
+/* ── KPI Cards ── */
+.kpi-card {
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 1.6rem 1.75rem;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.kpi-value {
+    font-family: "Manrope", "Helvetica Neue", sans-serif;
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #1D1D1F;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 0.35rem;
+}
+.kpi-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #86868B;
+}
+.kpi-sub {
+    font-size: 0.78rem;
+    color: #86868B;
+    margin-top: 0.45rem;
+    font-weight: 400;
+}
+
+/* ── Primary Button ── */
+.stButton > button {
+    background: #0071E3 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 980px !important;
+    padding: 0.6rem 1.6rem !important;
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    letter-spacing: -0.01em !important;
+    transition: box-shadow 0.15s ease, background 0.15s ease !important;
+    cursor: pointer !important;
+}
+.stButton > button:hover {
+    background: #0077ED !important;
+    box-shadow: 0 4px 14px rgba(0,113,227,0.35) !important;
+    transform: none !important;
+}
+
+/* ── Form Inputs ── */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input {
+    background: #FFFFFF !important;
+    border: 1px solid #D2D2D7 !important;
+    border-radius: 10px !important;
+    color: #1D1D1F !important;
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 0.9rem !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus {
+    border-color: #0071E3 !important;
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.15) !important;
+}
+.stSelectbox > div > div {
+    background: #FFFFFF !important;
+    border: 1px solid #D2D2D7 !important;
+    border-radius: 10px !important;
+}
+
+/* ── Labels ── */
+.stTextInput label, .stNumberInput label, .stSelectbox label, .stSlider label {
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    color: #1D1D1F !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+
+/* ── Section headings ── */
+h3 {
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: #1D1D1F !important;
+    letter-spacing: -0.02em !important;
+    margin: 1.5rem 0 0.75rem !important;
+}
+
+/* ── Tables ── */
+.ss-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.ss-table thead tr { border-bottom: 1px solid #E8E8ED; }
+.ss-table th {
+    font-size: 0.67rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: #86868B;
+    padding: 0 1rem 0.75rem; text-align: left; white-space: nowrap;
+}
+.ss-table td {
+    padding: 0.9rem 1rem; border-bottom: 1px solid #F2F2F7;
+    color: #1D1D1F; vertical-align: middle;
+}
+.ss-table tr:last-child td { border-bottom: none; }
+.td-primary { font-weight: 600; color: #1D1D1F; }
+.td-secondary { font-size: 0.78rem; color: #86868B; margin-top: 1px; }
+.td-pos { color: #1A7A1A; font-weight: 600; }
+.td-neg { color: #C0392B; font-weight: 600; }
+
+/* ── Pills ── */
+.pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 980px;
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em;
+}
+.pill-green { background: #F0FAF0; color: #1A7A1A; }
+.pill-blue  { background: #EBF2FF; color: #0055B3; }
+.pill-dot   { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+/* ── Property Cards ── */
+.prop-card {
+    background: #FFFFFF; border-radius: 18px; overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    margin-bottom: 1.25rem;
+}
+.prop-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.1); transform: translateY(-2px); }
+.prop-img-wrap { position: relative; overflow: hidden; height: 155px; background: #F5F5F7; }
+.prop-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prop-tag {
+    position: absolute; top: 10px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border-radius: 980px; padding: 3px 9px;
+    font-size: 0.68rem; font-weight: 700; color: #1D1D1F; letter-spacing: 0.03em;
+}
+.prop-tag-left { left: 10px; }
+.prop-tag-right {
+    right: 10px;
+    background: rgba(0,113,227,0.92) !important;
+    color: #FFF !important;
+}
+.prop-body { padding: 1.1rem 1.2rem 1.25rem; }
+.prop-address { font-size: 0.92rem; font-weight: 700; color: #1D1D1F; letter-spacing: -0.02em; margin-bottom: 2px; }
+.prop-city { font-size: 0.78rem; color: #86868B; margin-bottom: 0.85rem; }
+.prop-price { font-size: 1.25rem; font-weight: 800; color: #1D1D1F; letter-spacing: -0.03em; }
+.prop-share-line { font-size: 0.78rem; color: #86868B; margin: 2px 0 0.85rem; }
+.prop-specs {
+    display: flex; gap: 0.9rem; font-size: 0.76rem; color: #636366;
+    padding-top: 0.85rem; border-top: 1px solid #F2F2F7; font-weight: 500;
+}
+.invest-btn {
+    display: block; width: 100%; background: #0071E3; color: #FFFFFF;
+    border: none; border-radius: 10px; padding: 0.52rem 0;
+    font-family: "Manrope", "Helvetica Neue", sans-serif;
+    font-weight: 600; font-size: 0.83rem; text-align: center;
+    cursor: pointer; margin-top: 0.75rem; letter-spacing: -0.01em;
+    transition: background 0.15s ease;
+}
+.invest-btn:hover { background: #0077ED; }
+
+/* ── Team Cards ── */
+.team-card {
+    background: #FFFFFF; border-radius: 18px; padding: 1.75rem 1.5rem;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); text-align: center;
+}
+.team-avatar {
+    width: 68px; height: 68px;
+    background: linear-gradient(135deg, #1D1D1F, #3A3A3C);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #FFFFFF; font-size: 1rem; font-weight: 700;
+    margin: 0 auto 1rem; letter-spacing: -0.01em;
+}
+.team-name { font-size: 0.92rem; font-weight: 700; color: #1D1D1F; letter-spacing: -0.02em; }
+.team-role { font-size: 0.78rem; color: #86868B; margin-top: 0.2rem; }
+
+/* ── Misc ── */
+.ss-divider { border: none; border-top: 1px solid #E8E8ED; margin: 2rem 0; }
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important; gap: 0 !important;
+    border-bottom: 1px solid #E8E8ED !important;
+}
+.stTabs [data-baseweb="tab"] {
+    background: transparent !important; border: none !important;
+    padding: 0.6rem 1.1rem !important;
+    font-family: "Manrope", "Helvetica Neue", sans-serif !important;
+    font-size: 0.86rem !important; font-weight: 500 !important;
+    color: #86868B !important; border-radius: 0 !important;
+}
+.stTabs [aria-selected="true"] {
+    color: #0071E3 !important; font-weight: 700 !important;
+    border-bottom: 2px solid #0071E3 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style="padding: 0 1rem 1.5rem;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:0.5rem;">
+            <div style="
+                width:34px; height:34px; background:#0071E3; border-radius:9px;
+                display:flex; align-items:center; justify-content:center;
+                font-family:Manrope,Helvetica Neue,sans-serif;
+                font-weight:800; font-size:1rem; color:#FFF;
+                flex-shrink:0;
+            ">S</div>
+            <span style="
+                font-family:Manrope,Helvetica Neue,sans-serif;
+                font-size:1.05rem; font-weight:800; color:#1D1D1F; letter-spacing:-0.04em;
+            ">ShareStone</span>
+        </div>
+        <div style="
+            display:inline-block; margin-left:44px;
+            background:#F2F2F7; color:#636366;
+            font-size:0.62rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:0.08em;
+            padding:2px 8px; border-radius:980px;
+        ">Early Access</div>
+    </div>
+    <div style="height:1px; background:#E8E8ED; margin:0 1rem 1.25rem;"></div>
+    """, unsafe_allow_html=True)
+
+    page = st.radio(
+        "nav",
+        ["Valuation Engine", "Market Dashboard", "My Portfolio", "Property Explorer", "Settings"],
+        label_visibility="collapsed"
+    )
+
+    st.markdown("""
+    <div style="height:1px; background:#E8E8ED; margin:1.25rem 1rem 1.25rem;"></div>
+    <div style="padding:0 1rem 1.5rem;">
+        <div style="font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#86868B; margin-bottom:0.85rem;">System</div>
+        <div style="display:flex; align-items:center; gap:7px; margin-bottom:0.5rem;">
+            <div style="width:6px; height:6px; background:#30D158; border-radius:50%; flex-shrink:0;"></div>
+            <span style="font-size:0.82rem; color:#1D1D1F; font-weight:500; flex:1;">Inference API</span>
+            <span style="font-size:0.75rem; color:#86868B;">Online</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:7px;">
+            <div style="width:6px; height:6px; background:#30D158; border-radius:50%; flex-shrink:0;"></div>
+            <span style="font-size:0.82rem; color:#1D1D1F; font-weight:500; flex:1;">Market Data</span>
+            <span style="font-size:0.75rem; color:#86868B;">Live</span>
+        </div>
+    </div>
+    <div style="padding:0 1rem; font-size:0.7rem; color:#C7C7CC;">© 2025 ShareStone, Inc.</div>
+    """, unsafe_allow_html=True)
+
+
+# ─── Helpers ──────────────────────────────────
+def page_header(title, subtitle):
+    st.markdown(f"""
+    <div class="ss-page-header">
+        <div class="ss-page-title">{title}</div>
+        <div class="ss-page-subtitle">{subtitle}</div>
+    </div>""", unsafe_allow_html=True)
+
+def section_head(text):
+    st.markdown(f"<h3>{text}</h3>", unsafe_allow_html=True)
+
+def apply_chart_theme(fig, height=310):
+    fig.update_layout(
+        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        font=dict(family="Manrope, Helvetica Neue, sans-serif", color="#1D1D1F"),
+        title_font=dict(family="Manrope, Helvetica Neue, sans-serif", size=13, color="#1D1D1F"),
+        margin=dict(l=12, r=12, t=40, b=12), height=height,
+        xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=11, color="#86868B")),
+        yaxis=dict(gridcolor="#F2F2F7", zeroline=False, tickfont=dict(size=11, color="#86868B")),
+    )
+    return fig
+
+
+# ═════════════════════════════════════════════
+# PAGE 1 — VALUATION ENGINE
+# ═════════════════════════════════════════════
+if page == "Valuation Engine":
+    page_header("Valuation Engine", "AI-powered fair market value and fractional share pricing.")
+
+    st.markdown('<div class="ss-card">', unsafe_allow_html=True)
+    c1, c2 = st.columns(2, gap="large")
+    with c1:
+        state     = st.selectbox("State", ["Ohio","New York","Texas","Florida","California","Washington","Colorado","Georgia"])
+        bedrooms  = st.number_input("Bedrooms", min_value=1, max_value=10, value=3)
+        sqft      = st.number_input("Square Footage", min_value=500, max_value=10000, value=2000, step=100)
+    with c2:
+        city      = st.text_input("City", "Hilliard")
+        bathrooms = st.number_input("Bathrooms", min_value=1.0, max_value=10.0, value=2.0, step=0.5)
+        lot       = st.number_input("Lot Size (Acres)", min_value=0.01, max_value=50.0, value=0.25, step=0.05)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    btn_col, _ = st.columns([1, 4])
+    with btn_col:
+        run = st.button("Run Valuation")
+
+    if run:
+        payload = {"state": state, "city": city, "bed": bedrooms,
+                   "bath": bathrooms, "house_size": sqft, "acre_lot": lot}
+        with st.spinner("Querying inference engine…"):
+            try:
+                resp = requests.post(
+                    "https://sharestone-api-861810670522.us-central1.run.app/predict",
+                    json=payload, timeout=15)
+                if resp.status_code == 200:
+                    data  = resp.json()
+                    fmv   = data.get("fair_market_value", 0)
+                    share = data.get("one_percent_share", 0)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    m1, m2, m3, m4 = st.columns(4, gap="medium")
+                    m1.metric("Fair Market Value",   f"${fmv:,.0f}")
+                    m2.metric("1% Fractional Share", f"${share:,.0f}")
+                    m3.metric("Est. Annual Yield",   "6.4%",  "+0.3%")   # TODO: real model
+                    m4.metric("Market Percentile",   "72nd",  "+4 pts")  # TODO: real model
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    section_head("Comparable Sales")
+                    rows = ""
+                    for c in DUMMY_COMPARABLES:  # TODO: real comparables API
+                        cls = "td-pos" if "+" in c["delta"] else "td-neg"
+                        rows += f"""<tr>
+                            <td><div class="td-primary">{c['address']}</div>
+                                <div class="td-secondary">{c['city']}</div></td>
+                            <td>{c['beds']} bd / {c['baths']} ba</td>
+                            <td>{c['sqft']:,} sqft</td>
+                            <td><strong>${c['price']:,}</strong></td>
+                            <td>${c['share']:,}</td>
+                            <td class="{cls}">{c['delta']}</td></tr>"""
+                    st.markdown(f"""
+                    <div class="ss-card" style="padding: 0.5rem 0;">
+                    <table class="ss-table">
+                        <thead><tr>
+                            <th>Address</th><th>Beds / Baths</th><th>Size</th>
+                            <th>List Price</th><th>1% Share</th><th>vs. Subject</th>
+                        </tr></thead>
+                        <tbody>{rows}</tbody>
+                    </table></div>""", unsafe_allow_html=True)
+                else:
+                    st.error(f"Inference engine returned HTTP {resp.status_code}. Please try again.")
+            except Exception as e:
+                st.error(f"Unable to reach the valuation API. {e}")
+
+
+# ═════════════════════════════════════════════
+# PAGE 2 — MARKET DASHBOARD
+# ═════════════════════════════════════════════
+elif page == "Market Dashboard":
+    page_header("Market Dashboard", "Platform-wide analytics and real estate market intelligence.")  # TODO: live data
+
+    k1, k2, k3, k4 = st.columns(4, gap="medium")
+    for col, (label, val, sub) in zip(
+        [k1, k2, k3, k4],
+        [("Listings Analyzed", DUMMY_KPI["listings"], "+1,240 this week"),
+         ("Avg. Share Price",  DUMMY_KPI["avg_share"], "+$64 this month"),
+         ("Markets Covered",   DUMMY_KPI["markets"],   "8 states"),
+         ("Platform AUM",      DUMMY_KPI["aum"],       "+$12M this quarter")]
+    ):
+        with col:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-value">{val}</div>
+                <div class="kpi-label">{label}</div>
+                <div class="kpi-sub">{sub}</div>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    d1, d2 = st.columns(2, gap="large")
+
+    with d1:
+        section_head("Avg. Property Value by State")
+        df_s = pd.DataFrame({  # TODO: real API
+            "State": list(DUMMY_STATE_VALUES.keys()),
+            "Value": list(DUMMY_STATE_VALUES.values())
+        }).sort_values("Value", ascending=True)
+        fig_bar = px.bar(df_s, x="Value", y="State", orientation="h",
+                         color="Value", color_continuous_scale=["#E8E8ED", "#0071E3"])
+        fig_bar.update_traces(marker_line_width=0, marker_cornerradius=4)
+        fig_bar.update_coloraxes(showscale=False)
+        fig_bar = apply_chart_theme(fig_bar, 300)
+        fig_bar.update_layout(xaxis_title="", yaxis_title="")
+        st.markdown('<div class="ss-card" style="padding:1.25rem;">', unsafe_allow_html=True)
+        st.plotly_chart(fig_bar, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with d2:
+        section_head("Fractional Share Price Trend")
+        fig_line = go.Figure()
+        fig_line.add_trace(go.Scatter(  # TODO: real time-series API
+            x=DUMMY_TREND["months"], y=DUMMY_TREND["prices"],
+            mode="lines",
+            line=dict(color="#0071E3", width=2.5, shape="spline", smoothing=0.8),
+            fill="tozeroy", fillcolor="rgba(0,113,227,0.06)",
+            hovertemplate="<b>$%{y:,}</b><extra></extra>",
+        ))
+        fig_line = apply_chart_theme(fig_line, 300)
+        fig_line.update_layout(yaxis_title="Avg 1% Share ($)", xaxis_title="")
+        st.markdown('<div class="ss-card" style="padding:1.25rem;">', unsafe_allow_html=True)
+        st.plotly_chart(fig_line, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    section_head("Recent Transactions")
+    st.markdown("""
+    <div class="ss-card" style="padding:0.5rem 0;">
+    <table class="ss-table">
+        <thead><tr><th>Time</th><th>Property</th><th>Investor</th><th>Share</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+            <tr><td style="color:#86868B;font-size:0.8rem;">2 min ago</td>
+                <td><div class="td-primary">142 Elm Ridge Dr</div><div class="td-secondary">Hilliard, OH</div></td>
+                <td>J. Morrison</td><td>0.5%</td><td><strong>$1,590</strong></td>
+                <td><span class="pill pill-green"><span class="pill-dot"></span>Settled</span></td></tr>
+            <tr><td style="color:#86868B;font-size:0.8rem;">11 min ago</td>
+                <td><div class="td-primary">88 Lakeview Pkwy</div><div class="td-secondary">Austin, TX</div></td>
+                <td>S. Patel</td><td>1.0%</td><td><strong>$4,600</strong></td>
+                <td><span class="pill pill-green"><span class="pill-dot"></span>Settled</span></td></tr>
+            <tr><td style="color:#86868B;font-size:0.8rem;">34 min ago</td>
+                <td><div class="td-primary">33 Ocean Mist Blvd</div><div class="td-secondary">Miami, FL</div></td>
+                <td>R. Kim</td><td>0.5%</td><td><strong>$3,550</strong></td>
+                <td><span class="pill pill-green"><span class="pill-dot"></span>Settled</span></td></tr>
+            <tr><td style="color:#86868B;font-size:0.8rem;">1 hr ago</td>
+                <td><div class="td-primary">17 Harbor Lofts</div><div class="td-secondary">Brooklyn, NY</div></td>
+                <td>T. Nguyen</td><td>2.0%</td><td><strong>$17,800</strong></td>
+                <td><span class="pill pill-blue"><span class="pill-dot"></span>Pending</span></td></tr>
+        </tbody>
+    </table></div>""", unsafe_allow_html=True)  # TODO: real transaction feed
+
+
+# ═════════════════════════════════════════════
+# PAGE 3 — MY PORTFOLIO
+# ═════════════════════════════════════════════
+elif page == "My Portfolio":
+    page_header("My Portfolio", "Track your fractional holdings, returns, and geographic exposure.")  # TODO: user-specific data
+
+    m1, m2, m3, m4 = st.columns(4, gap="medium")
+    m1.metric("Total Invested",   "$15,050")   # TODO: real portfolio data
+    m2.metric("Current Value",    "$16,645",   "+$1,595")
+    m3.metric("Total Return",     "+10.6%",    "+2.1% YTD")
+    m4.metric("Active Positions", "4")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    p1, p2 = st.columns([1, 1.55], gap="large")
+
+    with p1:
+        section_head("Holdings by Type")
+        fig_d = go.Figure(go.Pie(  # TODO: real holdings
+            labels=["Single Family", "Multi-Family", "Condo"],
+            values=[65, 20, 15], hole=0.68,
+            marker=dict(colors=["#1D1D1F","#636366","#D2D2D7"],
+                        line=dict(color="#FFFFFF", width=3)),
+            textinfo="none",
+            hovertemplate="<b>%{label}</b><br>%{percent}<extra></extra>",
+        ))
+        fig_d.add_annotation(text="<b>$16,645</b>", x=0.5, y=0.56,
+            font=dict(size=14, color="#1D1D1F", family="Manrope"), showarrow=False)
+        fig_d.add_annotation(text="Total Value", x=0.5, y=0.39,
+            font=dict(size=10, color="#86868B", family="Manrope"), showarrow=False)
+        fig_d.update_layout(
+            paper_bgcolor="#FFFFFF", margin=dict(l=12,r=12,t=12,b=12), height=230,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5,
+                        font=dict(size=10, color="#636366", family="Manrope"))
+        )
+        st.markdown('<div class="ss-card" style="padding:1.25rem;">', unsafe_allow_html=True)
+        st.plotly_chart(fig_d, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with p2:
+        section_head("Active Positions")
+        rows = ""
+        for h in DUMMY_PORTFOLIO:  # TODO: real portfolio API
+            rows += f"""<tr>
+                <td><div class="td-primary">{h['property']}</div>
+                    <div class="td-secondary">{h['location']}</div></td>
+                <td>{h['share_pct']}</td>
+                <td>${h['purchase']:,}</td>
+                <td>${h['current']:,}</td>
+                <td class="td-pos">{h['return_pct']}</td></tr>"""
+        st.markdown(f"""
+        <div class="ss-card" style="padding:0.5rem 0;">
+        <table class="ss-table">
+            <thead><tr><th>Property</th><th>Share</th><th>Cost Basis</th>
+            <th>Market Value</th><th>Return</th></tr></thead>
+            <tbody>{rows}</tbody>
+        </table></div>""", unsafe_allow_html=True)
+
+    section_head("Geographic Allocation")
+    df_geo = pd.DataFrame({"State": ["Ohio","Texas","Florida"], "Pct": [55,30,15]})  # TODO: real data
+    fig_g = px.bar(df_geo, x="State", y="Pct", color_discrete_sequence=["#0071E3"], text="Pct")
+    fig_g.update_traces(texttemplate="%{text}%", textposition="outside",
+                        marker_cornerradius=6, marker_line_width=0)
+    fig_g = apply_chart_theme(fig_g, 220)
+    fig_g.update_layout(yaxis_title="Allocation (%)", xaxis_title="", showlegend=False)
+    st.markdown('<div class="ss-card" style="padding:1.25rem;">', unsafe_allow_html=True)
+    st.plotly_chart(fig_g, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════
+# PAGE 4 — PROPERTY EXPLORER
+# ═════════════════════════════════════════════
+elif page == "Property Explorer":
+    page_header("Property Explorer", "Browse available fractional investment opportunities.")  # TODO: live listings
+
+    f1, f2, f3 = st.columns([1.1, 1.1, 2], gap="medium")
+    with f1:
+        filter_state = st.selectbox("State", ["All States","Ohio","Texas","Florida","New York"])
+    with f2:
+        filter_type  = st.selectbox("Property Type", ["All Types","Single Family","Condo","Multi-Family"])
+    with f3:
+        max_price = st.slider("Max Property Price", 200000, 1000000, 1000000, step=50000, format="$%d")
+
+    filtered = [
+        p for p in DUMMY_LISTINGS   # TODO: server-side filtering
+        if (filter_state == "All States" or filter_state in p["city"])
+        and (filter_type == "All Types" or filter_type == p["type"])
+        and p["price"] <= max_price
+    ]
+
+    n = len(filtered)
+    st.markdown(f"""
+    <div style="font-size:0.82rem; color:#86868B; margin:0.4rem 0 1.25rem; font-weight:500;">
+        {n} propert{"y" if n==1 else "ies"} found
+    </div>""", unsafe_allow_html=True)
+
+    if not filtered:
+        st.info("No properties match your current filters.")
+    else:
+        cols = st.columns(3, gap="medium")
+        for i, p in enumerate(filtered):
+            with cols[i % 3]:
+                bg = ["F0F0F5","E8EBF0","EDF0F5"][i % 3]
+                txt = p["type"].replace(" ", "+")
+                st.markdown(f"""
+                <div class="prop-card">
+                    <div class="prop-img-wrap">
+                        <img src="https://placehold.co/400x200/{bg}/AAAAAA?text={txt}" alt="">
+                        <span class="prop-tag prop-tag-left">{p['type']}</span>
+                        <span class="prop-tag prop-tag-right">{p['yield']} yield</span>
+                    </div>
+                    <div class="prop-body">
+                        <div class="prop-address">{p['address']}</div>
+                        <div class="prop-city">{p['city']}</div>
+                        <div class="prop-price">${p['price']:,}</div>
+                        <div class="prop-share-line">1% share &nbsp;&middot;&nbsp; <strong>${p['share']:,}</strong></div>
+                        <div class="prop-specs">
+                            <span>{p['beds']} bd</span>
+                            <span>{p['baths']} ba</span>
+                            <span>{p['sqft']:,} sqft</span>
+                        </div>
+                        <button class="invest-btn">Invest Now</button>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════
+# PAGE 5 — SETTINGS
+# ═════════════════════════════════════════════
+elif page == "Settings":
+    page_header("Settings", "Account preferences and platform information.")
+
+    tab1, tab2 = st.tabs(["Account", "About ShareStone"])
+
+    with tab1:
+        section_head("Profile")
+        st.markdown('<div class="ss-card">', unsafe_allow_html=True)
+        a1, a2 = st.columns(2, gap="large")
+        with a1:
+            st.text_input("Full Name",     "Jane Investor")         # TODO: load from auth
+            st.text_input("Email Address", "jane@example.com")
+            st.selectbox("Accreditation Status",
+                ["Accredited Investor","Non-Accredited","Pending Review"])
+        with a2:
+            st.text_input("Organization", "Independent")
+            st.selectbox("Notifications", ["All Alerts","Digest Only","None"])
+            st.selectbox("Currency",      ["USD ($)","EUR (€)","GBP (£)"])
+        st.markdown("<br>", unsafe_allow_html=True)
+        bc, _ = st.columns([1,5])
+        with bc: st.button("Save Changes")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("<hr class='ss-divider'>", unsafe_allow_html=True)
+        section_head("Security")
+        st.markdown('<div class="ss-card">', unsafe_allow_html=True)
+        s1, s2 = st.columns(2, gap="large")
+        with s1:
+            st.text_input("Current Password", type="password")   # TODO: real auth
+            st.text_input("New Password",      type="password")
+        with s2:
+            st.text_input("Confirm Password",  type="password")
+            st.selectbox("Two-Factor Auth", ["Disabled","SMS","Authenticator App"])
+        st.markdown("<br>", unsafe_allow_html=True)
+        uc, _ = st.columns([1,5])
+        with uc: st.button("Update Password")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab2:
+        section_head("About ShareStone")
+        st.markdown("""
+        <div class="ss-card">
+            <p style="font-size:0.93rem; color:#3A3A3C; line-height:1.78; max-width:680px; font-weight:400; letter-spacing:-0.01em; margin:0 0 1.5rem;">
+                ShareStone is an institutional-grade fractional real estate platform that democratizes 
+                access to residential and commercial property assets. Using proprietary AI-driven 
+                valuation models, we price fractional shares with the precision previously reserved 
+                for institutional buyers — making real estate wealth-building accessible to everyone.
+            </p>
+            <div style="display:flex; gap:2.5rem; flex-wrap:wrap; padding-top:1.5rem; border-top:1px solid #F2F2F7;">
+                <div>
+                    <div style="font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;color:#1D1D1F;letter-spacing:-0.04em;">2024</div>
+                    <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#86868B;margin-top:2px;">Founded</div>
+                </div>
+                <div>
+                    <div style="font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;color:#1D1D1F;letter-spacing:-0.04em;">32</div>
+                    <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#86868B;margin-top:2px;">Markets</div>
+                </div>
+                <div>
+                    <div style="font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;color:#1D1D1F;letter-spacing:-0.04em;">$124M</div>
+                    <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#86868B;margin-top:2px;">AUM</div>
+                </div>
+                <div>
+                    <div style="font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;color:#1D1D1F;letter-spacing:-0.04em;">4,800+</div>
+                    <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#86868B;margin-top:2px;">Investors</div>
+                </div>
+            </div>
+        </div>""", unsafe_allow_html=True)  # TODO: pull from CMS
+
+        section_head("Team")
+        t1, t2, t3 = st.columns(3, gap="medium")
+        for col, m in zip([t1, t2, t3], DUMMY_TEAM):  # TODO: real team data
+            with col:
+                st.markdown(f"""
+                <div class="team-card">
+                    <div class="team-avatar">{m['init']}</div>
+                    <div class="team-name">{m['name']}</div>
+                    <div class="team-role">{m['title']}</div>
+                </div>""", unsafe_allow_html=True)
+
+        st.markdown("""
+        <hr class="ss-divider">
+        <div style="font-size:0.73rem; color:#C7C7CC; text-align:center; padding-bottom:1rem;">
+            ShareStone Inc. &nbsp;&middot;&nbsp; All investments involve risk &nbsp;&middot;&nbsp; 
+            Not financial advice &nbsp;&middot;&nbsp; © 2025
+        </div>""", unsafe_allow_html=True)
