@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# DUMMY DATA  (TODO: connect to real data)
+# DUMMY DATA
 # ─────────────────────────────────────────────
 DUMMY_COMPARABLES = [
     {"address": "142 Elm Ridge Dr",  "city": "Hilliard, OH",   "beds": 3, "baths": 2.0, "sqft": 1920, "price": 318000, "share": 3180, "delta": "+2.1%"},
@@ -44,10 +44,14 @@ DUMMY_TREND = {
 }
 
 DUMMY_PORTFOLIO = [
-    {"property": "142 Elm Ridge Dr",   "location": "Hilliard, OH",   "share_pct": "1.0%", "purchase": 3100, "current": 3420, "return_pct": "+10.3%"},
-    {"property": "511 Westfield Ct",   "location": "Worthington, OH","share_pct": "0.5%", "purchase": 1950, "current": 1975, "return_pct": "+1.3%"},
-    {"property": "88 Lakeview Pkwy",   "location": "Austin, TX",     "share_pct": "2.0%", "purchase": 7200, "current": 8100, "return_pct": "+12.5%"},
-    {"property": "33 Ocean Mist Blvd", "location": "Miami, FL",      "share_pct": "0.5%", "purchase": 2800, "current": 3150, "return_pct": "+12.5%"},
+    {"property": "142 Elm Ridge Dr",   "location": "Hilliard, OH",   "state": "Ohio",       "share_pct": "1.0%", "purchase": 3100, "current": 3420, "return_pct": "+10.3%"},
+    {"property": "511 Westfield Ct",   "location": "Worthington, OH","state": "Ohio",       "share_pct": "0.5%", "purchase": 1950, "current": 1975, "return_pct": "+1.3%"},
+    {"property": "88 Lakeview Pkwy",   "location": "Austin, TX",     "state": "Texas",      "share_pct": "2.0%", "purchase": 7200, "current": 8100, "return_pct": "+12.5%"},
+    {"property": "33 Ocean Mist Blvd", "location": "Miami, FL",      "state": "Florida",    "share_pct": "0.5%", "purchase": 2800, "current": 3150, "return_pct": "+12.5%"},
+    {"property": "17 Harbor Lofts",    "location": "Brooklyn, NY",   "state": "New York",   "share_pct": "1.0%", "purchase": 8900, "current": 9600, "return_pct": "+7.9%"},
+    {"property": "204 Birchwood Dr",   "location": "New Albany, OH", "state": "Ohio",       "share_pct": "0.5%", "purchase": 2600, "current": 2750, "return_pct": "+5.8%"},
+    {"property": "29 Maple Creek Ln",  "location": "Powell, OH",     "state": "Ohio",       "share_pct": "1.5%", "purchase": 5625, "current": 5900, "return_pct": "+4.9%"},
+    {"property": "88 Lakeview Pkwy B", "location": "Austin, TX",     "state": "Texas",      "share_pct": "1.0%", "purchase": 4600, "current": 5100, "return_pct": "+10.9%"},
 ]
 
 DUMMY_LISTINGS = [
@@ -452,9 +456,11 @@ def section_head(text):
 def apply_chart_theme(fig, height=310):
     fig.update_layout(
         plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        title="",                          # ← fix: suppress "undefined" title
         font=dict(family="Manrope, Helvetica Neue, sans-serif", color="#1D1D1F"),
         title_font=dict(family="Manrope, Helvetica Neue, sans-serif", size=13, color="#1D1D1F"),
-        margin=dict(l=12, r=12, t=40, b=12), height=height,
+        margin=dict(l=12, r=12, t=12, b=12),  # ← fix: t=12 instead of t=40
+        height=height,
         xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=11, color="#86868B")),
         yaxis=dict(gridcolor="#F2F2F7", zeroline=False, tickfont=dict(size=11, color="#86868B")),
     )
@@ -500,13 +506,13 @@ if page == "Valuation Engine":
                     m1, m2, m3, m4 = st.columns(4, gap="medium")
                     m1.metric("Fair Market Value",   f"${fmv:,.0f}")
                     m2.metric("1% Fractional Share", f"${share:,.0f}")
-                    m3.metric("Est. Annual Yield",   "6.4%",  "+0.3%")   # TODO: real model
-                    m4.metric("Market Percentile",   "72nd",  "+4 pts")  # TODO: real model
+                    m3.metric("Est. Annual Yield",   "6.4%",  "+0.3%")
+                    m4.metric("Market Percentile",   "72nd",  "+4 pts")
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     section_head("Comparable Sales")
                     rows = ""
-                    for c in DUMMY_COMPARABLES:  # TODO: real comparables API
+                    for c in DUMMY_COMPARABLES:
                         cls = "td-pos" if "+" in c["delta"] else "td-neg"
                         rows += f"""<tr>
                             <td><div class="td-primary">{c['address']}</div>
@@ -535,7 +541,7 @@ if page == "Valuation Engine":
 # PAGE 2 — MARKET DASHBOARD
 # ═════════════════════════════════════════════
 elif page == "Market Dashboard":
-    page_header("Market Dashboard", "Platform-wide analytics and real estate market intelligence.")  # TODO: live data
+    page_header("Market Dashboard", "Platform-wide analytics and real estate market intelligence.")
 
     k1, k2, k3, k4 = st.columns(4, gap="medium")
     for col, (label, val, sub) in zip(
@@ -558,7 +564,7 @@ elif page == "Market Dashboard":
 
     with d1:
         section_head("Avg. Property Value by State")
-        df_s = pd.DataFrame({  # TODO: real API
+        df_s = pd.DataFrame({
             "State": list(DUMMY_STATE_VALUES.keys()),
             "Value": list(DUMMY_STATE_VALUES.values())
         }).sort_values("Value", ascending=True)
@@ -575,7 +581,7 @@ elif page == "Market Dashboard":
     with d2:
         section_head("Fractional Share Price Trend")
         fig_line = go.Figure()
-        fig_line.add_trace(go.Scatter(  # TODO: real time-series API
+        fig_line.add_trace(go.Scatter(
             x=DUMMY_TREND["months"], y=DUMMY_TREND["prices"],
             mode="lines",
             line=dict(color="#0071E3", width=2.5, shape="spline", smoothing=0.8),
@@ -611,40 +617,56 @@ elif page == "Market Dashboard":
                 <td>T. Nguyen</td><td>2.0%</td><td><strong>$17,800</strong></td>
                 <td><span class="pill pill-blue"><span class="pill-dot"></span>Pending</span></td></tr>
         </tbody>
-    </table></div>""", unsafe_allow_html=True)  # TODO: real transaction feed
+    </table></div>""", unsafe_allow_html=True)
 
 
 # ═════════════════════════════════════════════
 # PAGE 3 — MY PORTFOLIO
 # ═════════════════════════════════════════════
 elif page == "My Portfolio":
-    page_header("My Portfolio", "Track your fractional holdings, returns, and geographic exposure.")  # TODO: user-specific data
+    page_header("My Portfolio", "Track your fractional holdings, returns, and geographic exposure.")
+
+    total_invested = sum(h["purchase"] for h in DUMMY_PORTFOLIO)
+    total_current  = sum(h["current"]  for h in DUMMY_PORTFOLIO)
+    total_return   = (total_current - total_invested) / total_invested * 100
 
     m1, m2, m3, m4 = st.columns(4, gap="medium")
-    m1.metric("Total Invested",   "$15,050")   # TODO: real portfolio data
-    m2.metric("Current Value",    "$16,645",   "+$1,595")
-    m3.metric("Total Return",     "+10.6%",    "+2.1% YTD")
-    m4.metric("Active Positions", "4")
+    m1.metric("Total Invested",   f"${total_invested:,}")
+    m2.metric("Current Value",    f"${total_current:,}", f"+${total_current - total_invested:,}")
+    m3.metric("Total Return",     f"+{total_return:.1f}%", "+2.1% YTD")
+    m4.metric("Active Positions", str(len(DUMMY_PORTFOLIO)))
 
     st.markdown("<br>", unsafe_allow_html=True)
     p1, p2 = st.columns([1, 1.55], gap="large")
 
     with p1:
         section_head("Holdings by Type")
-        fig_d = go.Figure(go.Pie(  # TODO: real holdings
-            labels=["Single Family", "Multi-Family", "Condo"],
-            values=[65, 20, 15], hole=0.68,
+        # Derive from portfolio data
+        type_map = {
+            "Ohio": "Single Family", "Texas": "Single Family",
+            "Florida": "Condo", "New York": "Multi-Family"
+        }
+        type_values = {}
+        for h in DUMMY_PORTFOLIO:
+            t = type_map.get(h["state"], "Single Family")
+            type_values[t] = type_values.get(t, 0) + h["current"]
+
+        fig_d = go.Figure(go.Pie(
+            labels=list(type_values.keys()),
+            values=list(type_values.values()),
+            hole=0.68,
             marker=dict(colors=["#1D1D1F","#636366","#D2D2D7"],
                         line=dict(color="#FFFFFF", width=3)),
             textinfo="none",
             hovertemplate="<b>%{label}</b><br>%{percent}<extra></extra>",
         ))
-        fig_d.add_annotation(text="<b>$16,645</b>", x=0.5, y=0.56,
-            font=dict(size=14, color="#1D1D1F", family="Manrope"), showarrow=False)
+        fig_d.add_annotation(text=f"<b>${total_current:,}</b>", x=0.5, y=0.56,
+            font=dict(size=12, color="#1D1D1F", family="Manrope"), showarrow=False)
         fig_d.add_annotation(text="Total Value", x=0.5, y=0.39,
             font=dict(size=10, color="#86868B", family="Manrope"), showarrow=False)
         fig_d.update_layout(
             paper_bgcolor="#FFFFFF", margin=dict(l=12,r=12,t=12,b=12), height=230,
+            title="",
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5,
                         font=dict(size=10, color="#636366", family="Manrope"))
@@ -656,14 +678,15 @@ elif page == "My Portfolio":
     with p2:
         section_head("Active Positions")
         rows = ""
-        for h in DUMMY_PORTFOLIO:  # TODO: real portfolio API
+        for h in DUMMY_PORTFOLIO:
+            ret_cls = "td-pos" if "+" in h["return_pct"] else "td-neg"
             rows += f"""<tr>
                 <td><div class="td-primary">{h['property']}</div>
                     <div class="td-secondary">{h['location']}</div></td>
                 <td>{h['share_pct']}</td>
                 <td>${h['purchase']:,}</td>
                 <td>${h['current']:,}</td>
-                <td class="td-pos">{h['return_pct']}</td></tr>"""
+                <td class="{ret_cls}">{h['return_pct']}</td></tr>"""
         st.markdown(f"""
         <div class="ss-card" style="padding:0.5rem 0;">
         <table class="ss-table">
@@ -673,12 +696,25 @@ elif page == "My Portfolio":
         </table></div>""", unsafe_allow_html=True)
 
     section_head("Geographic Allocation")
-    df_geo = pd.DataFrame({"State": ["Ohio","Texas","Florida"], "Pct": [55,30,15]})  # TODO: real data
+
+    # ← fix: derive from portfolio data dynamically across all states
+    state_totals = {}
+    for h in DUMMY_PORTFOLIO:
+        state_totals[h["state"]] = state_totals.get(h["state"], 0) + h["current"]
+    total_val = sum(state_totals.values())
+    df_geo = pd.DataFrame({
+        "State": list(state_totals.keys()),
+        "Pct":   [round(v / total_val * 100) for v in state_totals.values()]
+    }).sort_values("Pct", ascending=False)
+
     fig_g = px.bar(df_geo, x="State", y="Pct", color_discrete_sequence=["#0071E3"], text="Pct")
     fig_g.update_traces(texttemplate="%{text}%", textposition="outside",
                         marker_cornerradius=6, marker_line_width=0)
-    fig_g = apply_chart_theme(fig_g, 220)
-    fig_g.update_layout(yaxis_title="Allocation (%)", xaxis_title="", showlegend=False)
+    fig_g = apply_chart_theme(fig_g, 260)
+    fig_g.update_layout(yaxis_title="Allocation (%)", xaxis_title="", showlegend=False,
+                        yaxis=dict(range=[0, df_geo["Pct"].max() + 10],
+                                   gridcolor="#F2F2F7", zeroline=False,
+                                   tickfont=dict(size=11, color="#86868B")))
     st.markdown('<div class="ss-card" style="padding:1.25rem;">', unsafe_allow_html=True)
     st.plotly_chart(fig_g, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -688,7 +724,7 @@ elif page == "My Portfolio":
 # PAGE 4 — PROPERTY EXPLORER
 # ═════════════════════════════════════════════
 elif page == "Property Explorer":
-    page_header("Property Explorer", "Browse available fractional investment opportunities.")  # TODO: live listings
+    page_header("Property Explorer", "Browse available fractional investment opportunities.")
 
     f1, f2, f3 = st.columns([1.1, 1.1, 2], gap="medium")
     with f1:
@@ -699,7 +735,7 @@ elif page == "Property Explorer":
         max_price = st.slider("Max Property Price", 200000, 1000000, 1000000, step=50000, format="$%d")
 
     filtered = [
-        p for p in DUMMY_LISTINGS   # TODO: server-side filtering
+        p for p in DUMMY_LISTINGS
         if (filter_state == "All States" or filter_state in p["city"])
         and (filter_type == "All Types" or filter_type == p["type"])
         and p["price"] <= max_price
@@ -754,7 +790,7 @@ elif page == "Settings":
         st.markdown('<div class="ss-card">', unsafe_allow_html=True)
         a1, a2 = st.columns(2, gap="large")
         with a1:
-            st.text_input("Full Name",     "Jane Investor")         # TODO: load from auth
+            st.text_input("Full Name",     "Jane Investor")
             st.text_input("Email Address", "jane@example.com")
             st.selectbox("Accreditation Status",
                 ["Accredited Investor","Non-Accredited","Pending Review"])
@@ -772,7 +808,7 @@ elif page == "Settings":
         st.markdown('<div class="ss-card">', unsafe_allow_html=True)
         s1, s2 = st.columns(2, gap="large")
         with s1:
-            st.text_input("Current Password", type="password")   # TODO: real auth
+            st.text_input("Current Password", type="password")
             st.text_input("New Password",      type="password")
         with s2:
             st.text_input("Confirm Password",  type="password")
@@ -787,9 +823,9 @@ elif page == "Settings":
         st.markdown("""
         <div class="ss-card">
             <p style="font-size:0.93rem; color:#3A3A3C; line-height:1.78; max-width:680px; font-weight:400; letter-spacing:-0.01em; margin:0 0 1.5rem;">
-                ShareStone is an institutional-grade fractional real estate platform that democratizes 
-                access to residential and commercial property assets. Using proprietary AI-driven 
-                valuation models, we price fractional shares with the precision previously reserved 
+                ShareStone is an institutional-grade fractional real estate platform that democratizes
+                access to residential and commercial property assets. Using proprietary AI-driven
+                valuation models, we price fractional shares with the precision previously reserved
                 for institutional buyers — making real estate wealth-building accessible to everyone.
             </p>
             <div style="display:flex; gap:2.5rem; flex-wrap:wrap; padding-top:1.5rem; border-top:1px solid #F2F2F7;">
@@ -810,11 +846,11 @@ elif page == "Settings":
                     <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#86868B;margin-top:2px;">Investors</div>
                 </div>
             </div>
-        </div>""", unsafe_allow_html=True)  # TODO: pull from CMS
+        </div>""", unsafe_allow_html=True)
 
         section_head("Team")
         t1, t2, t3 = st.columns(3, gap="medium")
-        for col, m in zip([t1, t2, t3], DUMMY_TEAM):  # TODO: real team data
+        for col, m in zip([t1, t2, t3], DUMMY_TEAM):
             with col:
                 st.markdown(f"""
                 <div class="team-card">
@@ -826,6 +862,6 @@ elif page == "Settings":
         st.markdown("""
         <hr class="ss-divider">
         <div style="font-size:0.73rem; color:#C7C7CC; text-align:center; padding-bottom:1rem;">
-            ShareStone Inc. &nbsp;&middot;&nbsp; All investments involve risk &nbsp;&middot;&nbsp; 
+            ShareStone Inc. &nbsp;&middot;&nbsp; All investments involve risk &nbsp;&middot;&nbsp;
             Not financial advice &nbsp;&middot;&nbsp; © 2025
         </div>""", unsafe_allow_html=True)
